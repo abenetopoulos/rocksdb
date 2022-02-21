@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include "db/cache/cache.h"
 #include "db/column_family.h"
 #include "db/compaction/compaction_iterator.h"
 #include "db/compaction/compaction_job.h"
@@ -2327,6 +2328,9 @@ class DBImpl : public DB {
   // Indicate if deprecation warning message is logged before. Will be removed
   // soon with the deprecated feature.
   std::atomic_bool iter_start_seqnum_deprecation_warned_{false};
+
+  // Lookaside cache.
+  cache* lookasideCache;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src,

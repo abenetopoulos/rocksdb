@@ -280,6 +280,8 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   if (write_buffer_manager_) {
     wbm_stall_.reset(new WBMStallInterface());
   }
+
+  lookasideCache = new cache();
 }
 
 Status DBImpl::Resume() {
