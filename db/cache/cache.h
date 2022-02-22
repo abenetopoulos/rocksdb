@@ -12,8 +12,8 @@ using namespace std;
 namespace ROCKSDB_NAMESPACE {
     // TODO consider making this a template
     struct eviction_policy {
-        virtual void MarkInsertion(Slice& key);
-        virtual void MarkAccess(Slice& key);
+        virtual void MarkInsertion(string& key);
+        virtual void MarkAccess(string& key);
         virtual string Evict();
 
         virtual ~eviction_policy() { }
@@ -31,6 +31,7 @@ namespace ROCKSDB_NAMESPACE {
         lfu_key_node(string k): key(k) {
             prev = nullptr;
             next = nullptr;
+
             frequencyNode = nullptr;
         }
     };
@@ -51,6 +52,53 @@ namespace ROCKSDB_NAMESPACE {
 
             keys = nullptr;
         }
+
+        void AddKey(lfu_key_node *keyNode) {
+            keyNode->frequencyNode = this;
+
+            keyNode->prev = nullptr;
+            keyNode->next = keys;
+
+            keys = keyNode;
+        }
+
+        void RemoveKey(lfu_key_node *keyNode) {
+            assert(keyNode->frequencyNode == this);
+
+            if (keyNode->prev) {
+                keyNode->prev->next = keyNode->next;
+            } else {
+                // since the given key node is at the head of the key node list,
+                // we need to update the frequency node's pointer to point to the
+                // key node's successor.
+                this->keys = keyNode->next;
+            }
+
+            if (keyNode->next) {
+                keyNode->next->prev = keyNode->prev;
+            }
+
+            keyNode->frequencyNode = nullptr;
+        }
+
+        void ExchangeKey(lfu_key_node *keyNode, lfu_frequency_node *targetFrequencyNode) {
+            this->RemoveKey(keyNode);
+            targetFrequencyNode->AddKey(keyNode);
+        }
+
+        ~lfu_frequency_node() {
+            if (!this->prev && !this->next) {
+                return;
+            }
+
+            if (this->prev) {
+                this->prev->next = this->next;
+            }
+
+            if (this->next) {
+                this->next->prev = this->prev;
+            }
+        }
     };
 
     // An implementation of a constant-time LFU cache.
@@ -68,9 +116,9 @@ namespace ROCKSDB_NAMESPACE {
             frequencies = nullptr;
         }
 
-        void MarkInsertion(Slice& key) {
-            lfu_key_node *keyNode = new lfu_key_node(key.data());
-            (*map)[key.data()] = keyNode;
+        void MarkInsertion(string& key) {
+            lfu_key_node *keyNode = new lfu_key_node(key);
+            (*map)[key] = keyNode;
 
             lfu_frequency_node* frequencyNode = frequencies;
 
@@ -85,52 +133,37 @@ namespace ROCKSDB_NAMESPACE {
                 frequencyNode = newFrequencyNode;
             }
 
-            keyNode->next = frequencyNode->keys;
-            if (frequencyNode->keys) {
-                keyNode->prev = frequencyNode->keys->prev;
-            }
-            frequencyNode->keys = keyNode;
-            keyNode->frequencyNode = frequencyNode;
+            frequencyNode->AddKey(keyNode);
         }
 
-        void MarkAccess(Slice& key) {
-            lfu_key_node* keyNode = (*map)[key.data()];
+        void MarkAccess(string& key) {
+            lfu_key_node* keyNode = (*map)[key];
             lfu_frequency_node* frequencyNode = keyNode->frequencyNode;
 
             lfu_frequency_node* newFrequencyNode = frequencyNode->next;
             if (!newFrequencyNode || newFrequencyNode->frequency != (frequencyNode->frequency + 1)) {
                 newFrequencyNode = new lfu_frequency_node(frequencyNode->frequency + 1);
+
                 newFrequencyNode->prev = frequencyNode;
                 newFrequencyNode->next = frequencyNode->next;
                 frequencyNode->next = newFrequencyNode;
             }
 
-            frequencyNode->keys = keyNode->next;
-            keyNode->frequencyNode = newFrequencyNode;
-            keyNode->next->prev = keyNode->prev;
-            keyNode->prev->next = keyNode->next;
-
-            keyNode->prev = nullptr;
-            keyNode->next = newFrequencyNode->keys;
+            frequencyNode->ExchangeKey(keyNode, newFrequencyNode);
 
             if (!frequencyNode->keys) {
-                frequencyNode->next->prev = frequencyNode->prev;
-                frequencyNode->prev->next = frequencyNode->next;
                 delete frequencyNode;
             }
         }
 
         string Evict() {
-            string res = "";
-
             if (!frequencies || !frequencies->keys) {
-                // FIXME
-                return res;
+                return NO_FREQUENCY_INFO;
             }
 
             lfu_key_node* nodeToEvict = frequencies->keys;
 
-            res = nodeToEvict->key;
+            string res = nodeToEvict->key;
             frequencies->keys = nodeToEvict->next;
             if (nodeToEvict->next) {
                 nodeToEvict->next->prev = nodeToEvict->prev;
@@ -166,6 +199,7 @@ namespace ROCKSDB_NAMESPACE {
 
     // TODO consider turning this into a template to parameterize the value type
     struct cache {
+        static const string NOT_FOUND;
         robin_hood::unordered_map<string, string> *map;
         uint64_t capacity;
 
@@ -178,32 +212,49 @@ namespace ROCKSDB_NAMESPACE {
             policy = new lfu_policy(capacity);
         }
 
-        string Lookup(Slice& key) {
+        string Lookup(Slice& keySlice) {
             string res;
+            string key = keySlice.data();
 
             try {
-                res = this->map->at(key.data());
+                res = this->map->at(key);
                 policy->MarkAccess(key);
             } catch(const std::out_of_range& e) {
-                // FIXME
-                res = "";
+                return NOT_FOUND;
             }
 
             return res;
         }
 
-        void Insert(Slice& key, Slice& value) {
-            if (Lookup(key) != "") {
+        void Insert(Slice& keySlice, Slice& valueSlice) {
+            if (Lookup(keySlice) != NOT_FOUND) {
                 // TODO should we call `MarkAccess()` here?
                 return;
             }
 
             if (map->size() == capacity) {
-                string evictedKey = policy->Evict();
+                policy->Evict();
             }
 
-            (*this->map)[key.data()] = value.data();
+            string key = keySlice.data();
+
+            (*this->map)[key] = valueSlice.data();
             policy->MarkInsertion(key);
         }
+
+        void Update(Slice& keySlice, Slice& updatedValueSlice) {
+            if (Lookup(keySlice) != NOT_FOUND) {
+                // TODO should we call `MarkAccess()` here?
+                return;
+            }
+
+            string key = keySlice.data();
+
+            (*this->map)[key] = updatedValueSlice.data();
+            policy->MarkAccess(key);
+        }
     };
+
+    const string lfu_policy::NO_FREQUENCY_INFO = "ELFUPOLICYNOFREQINFO";
+    const string cache::NOT_FOUND = "ECACHENOTFOUND";
 }
