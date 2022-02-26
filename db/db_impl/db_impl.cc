@@ -27,6 +27,7 @@
 
 #include "db/arena_wrapped_db_iter.h"
 #include "db/builder.h"
+#include "db/cache/cache.h"
 #include "db/compaction/compaction_job.h"
 #include "db/db_info_dumper.h"
 #include "db/db_iter.h"
@@ -281,7 +282,11 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
     wbm_stall_.reset(new WBMStallInterface());
   }
 
-  lookasideCache = new cache();
+  if (options.use_lookaside_cache) {
+      cache_options cacheOptions = cache_options();
+      cacheOptions.UpdateFromEnv();
+      lookasideCache = new cache(cacheOptions);
+  }
 }
 
 Status DBImpl::Resume() {

@@ -158,6 +158,20 @@ namespace ROCKSDB_NAMESPACE {
         policy = new lfu_policy(capacity);
     }
 
+    cache::cache(cache_options &options) {
+        capacity = options.numEntries;
+        map = new robin_hood::unordered_map<string, string>(capacity);
+
+        switch (options.policy) {
+            case lookaside_cache_policy::CACHE_POLICY_LFU:
+            default:  // temporary
+                {
+                    policy = new lfu_policy(capacity);
+                    break;
+                }
+        }
+    }
+
     string cache::Lookup(Slice& keySlice) {
         string res;
         string key = keySlice.data();

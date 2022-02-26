@@ -2,6 +2,7 @@
 
 #include "robin_hood.h"
 #include "rocksdb/db.h"
+#include "rocksdb/options.h"
 
 
 using namespace std;
@@ -77,6 +78,7 @@ namespace ROCKSDB_NAMESPACE {
 
         cache();
         cache(uint64_t c);
+        cache(cache_options &options);
 
         string Lookup(Slice& keySlice);
         void Insert(Slice& keySlice, Slice& valueSlice);

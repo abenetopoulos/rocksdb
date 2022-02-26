@@ -682,4 +682,29 @@ ReadOptions::ReadOptions(bool cksum, bool cache)
       value_size_soft_limit(std::numeric_limits<uint64_t>::max()),
       adaptive_readahead(false) {}
 
+void cache_options::UpdateFromEnv() {
+  // a true hack, not to be imitated
+  char* val;
+  if ((val = std::getenv(numEntriesKey.c_str())) != nullptr) {
+    numEntries = strtoull(val, nullptr, 10);
+  }
+
+  if ((val = std::getenv(policyKey.c_str())) != nullptr) {
+    try {
+      policy = policyTable.at(val);
+    } catch (const std::out_of_range& e) {
+      // Do nothing, just default to LFU policy for now.
+    }
+  }
+
+  if ((val = std::getenv(collectStatisticsKey.c_str())) != nullptr) {
+    // NOTE nasty
+    collectStatistics = (bool) atoi(val);
+  }
+}
+
+const std::string cache_options::numEntriesKey = "LA_CACHE_N_ENTRIES";
+const std::string cache_options::policyKey = "LA_CACHE_POLICY";
+const std::string cache_options::collectStatisticsKey = "LA_CACHE_COLLECT_STATS";
+
 }  // namespace ROCKSDB_NAMESPACE
