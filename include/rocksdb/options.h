@@ -1941,11 +1941,9 @@ const policyTable = {
 struct cache_options {
     uint64_t numEntries = 1024;
     lookaside_cache_policy policy = lookaside_cache_policy::CACHE_POLICY_LFU;
-    bool collectStatistics = false;  // TODO
 
     static const std::string numEntriesKey;
     static const std::string policyKey;
-    static const std::string collectStatisticsKey;
 
     void UpdateFromEnv();
 };

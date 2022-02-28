@@ -696,15 +696,9 @@ void cache_options::UpdateFromEnv() {
       // Do nothing, just default to LFU policy for now.
     }
   }
-
-  if ((val = std::getenv(collectStatisticsKey.c_str())) != nullptr) {
-    // NOTE nasty
-    collectStatistics = (bool) atoi(val);
-  }
 }
 
 const std::string cache_options::numEntriesKey = "LA_CACHE_N_ENTRIES";
 const std::string cache_options::policyKey = "LA_CACHE_POLICY";
-const std::string cache_options::collectStatisticsKey = "LA_CACHE_COLLECT_STATS";
 
 }  // namespace ROCKSDB_NAMESPACE
