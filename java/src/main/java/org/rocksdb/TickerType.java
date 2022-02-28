@@ -796,6 +796,10 @@ public enum TickerType {
     WARM_FILE_READ_COUNT((byte) -0x28),
     COLD_FILE_READ_COUNT((byte) -0x29),
 
+    LOOKASIDE_CACHE_HIT((byte) -0x2a),
+    LOOKASIDE_CACHE_MISS((byte) -0x2b),
+    LOOKASIDE_CACHE_EVICTION((byte) -0x2c),
+
     TICKER_ENUM_MAX((byte) 0x5F);
 
     private final byte value;

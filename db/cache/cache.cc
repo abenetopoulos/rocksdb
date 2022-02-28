@@ -179,7 +179,9 @@ namespace ROCKSDB_NAMESPACE {
         try {
             res = this->map->at(key);
             policy->MarkAccess(key);
+            RecordTick(stats_, LOOKASIDE_CACHE_HIT);
         } catch(const std::out_of_range& e) {
+            RecordTick(stats_, LOOKASIDE_CACHE_MISS);
             return NOT_FOUND;
         }
 
@@ -194,6 +196,7 @@ namespace ROCKSDB_NAMESPACE {
 
         if (map->size() == capacity) {
             policy->Evict();
+            RecordTick(stats_, LOOKASIDE_CACHE_EVICTION);
         }
 
         string key = keySlice.data();

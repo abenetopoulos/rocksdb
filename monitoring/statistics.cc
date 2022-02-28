@@ -222,6 +222,9 @@ const std::vector<std::pair<Tickers, std::string>> TickersNameMap = {
     {HOT_FILE_READ_COUNT, "rocksdb.hot.file.read.count"},
     {WARM_FILE_READ_COUNT, "rocksdb.warm.file.read.count"},
     {COLD_FILE_READ_COUNT, "rocksdb.cold.file.read.count"},
+    {LOOKASIDE_CACHE_HIT, "rocksdb.lookaside.cache.hit"},
+    {LOOKASIDE_CACHE_MISS, "rocksdb.lookaside.cache.miss"},
+    {LOOKASIDE_CACHE_EVICTION, "rocksdb.lookaside.cache.eviction"},
 };
 
 const std::vector<std::pair<Histograms, std::string>> HistogramsNameMap = {

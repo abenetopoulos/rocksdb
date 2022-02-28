@@ -1,8 +1,10 @@
 #pragma once
 
 #include "robin_hood.h"
+#include "monitoring/statistics.h"
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
+#include "rocksdb/statistics.h"
 
 
 using namespace std;
@@ -73,6 +75,10 @@ namespace ROCKSDB_NAMESPACE {
         static const string NOT_FOUND;
         robin_hood::unordered_map<string, string> *map;
         uint64_t capacity;
+
+
+        // NOTE this is here simply because I am lazy.
+        Statistics* stats_;
 
         eviction_policy *policy;
 
