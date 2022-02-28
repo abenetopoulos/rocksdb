@@ -286,6 +286,8 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       cache_options cacheOptions = cache_options();
       cacheOptions.UpdateFromEnv();
       lookasideCache = new cache(cacheOptions);
+
+      lookasideCache->stats_ = immutable_db_options_.stats;
   }
 }
 
@@ -1805,6 +1807,10 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
       snapshot = get_impl_options.callback->max_visible_seq();
     }
   }
+  // NOTE(achilles) at this point we know the "snapshot" we want to read from
+  // but what is a snapshot, and how does it correlate with the levels of the
+  // backing LSM-tree?
+
   // If timestamp is used, we use read callback to ensure <key,t,s> is returned
   // only if t <= read_opts.timestamp and s <= snapshot.
   // HACK: temporarily overwrite input struct field but restore
@@ -1829,6 +1835,18 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
   LookupKey lkey(key, snapshot, read_options.timestamp);
   PERF_TIMER_STOP(get_snapshot_time);
 
+
+  if (lookasideCache) {
+    std::string* cache_result = lookasideCache->Lookup(lkey);
+
+    if (cache_result) {
+      // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+      std::string* value = get_impl_options.value->GetSelf();
+      value->assign(*cache_result);
+      return Status::OK();
+    }
+  }
+
   bool skip_memtable = (read_options.read_tier == kPersistedTier &&
                         has_unpersisted_data_.load(std::memory_order_relaxed));
   bool done = false;
@@ -1842,6 +1860,10 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
                        get_impl_options.is_blob_index)) {
         done = true;
         get_impl_options.value->PinSelf();
+
+        // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+        lookasideCache->Insert(lkey, get_impl_options.value->GetSelf());
+
         RecordTick(stats_, MEMTABLE_HIT);
       } else if ((s.ok() || s.IsMergeInProgress()) &&
                  sv->imm->Get(lkey, get_impl_options.value->GetSelf(),
@@ -1851,6 +1873,10 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
                               get_impl_options.is_blob_index)) {
         done = true;
         get_impl_options.value->PinSelf();
+
+        // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+        lookasideCache->Insert(lkey, get_impl_options.value->GetSelf());
+
         RecordTick(stats_, MEMTABLE_HIT);
       }
     } else {
@@ -1860,12 +1886,14 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
                        &merge_context, &max_covering_tombstone_seq,
                        read_options, nullptr, nullptr, false)) {
         done = true;
+        // TODO(achilles): do insertion here
         RecordTick(stats_, MEMTABLE_HIT);
       } else if ((s.ok() || s.IsMergeInProgress()) &&
                  sv->imm->GetMergeOperands(lkey, &s, &merge_context,
                                            &max_covering_tombstone_seq,
                                            read_options)) {
         done = true;
+        // TODO(achilles): do insertion here
         RecordTick(stats_, MEMTABLE_HIT);
       }
     }
@@ -1884,10 +1912,15 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
         get_impl_options.get_value ? get_impl_options.callback : nullptr,
         get_impl_options.get_value ? get_impl_options.is_blob_index : nullptr,
         get_impl_options.get_value);
+
+    // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+    lookasideCache->Insert(lkey, get_impl_options.value->GetSelf());
+
     RecordTick(stats_, MEMTABLE_MISS);
   }
 
   {
+    // TODO(achilles): figure out what we need to do here.
     PERF_TIMER_GUARD(get_post_process_time);
 
     ReturnAndCleanupSuperVersion(cfd, sv);
