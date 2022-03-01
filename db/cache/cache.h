@@ -71,7 +71,13 @@ namespace ROCKSDB_NAMESPACE {
     void DeleteFrequencyNode(lfu_frequency_node* frequencyNode);
   };
 
-  // TODO consider turning this into a template to parameterize the value type
+  // TODOs (in priority order)
+  // - Support more policies: for now, we can either switch the type of the `policy` member to be
+  //    `eviction_policy*`, _or_ we can have one member for each policy
+  //    type, and instantiate/use the appropriate one based on the policy
+  //    we get passed at init. Performance-wise, the second solution should
+  //    be better (avoiding vtable lookups etc.), but it is uglier.
+  // - consider turning this into a template to parameterize the value type
   struct cache {
     static const string NOT_FOUND;
     // robin_hood::unordered_map<string, string> *map;
