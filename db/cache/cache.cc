@@ -50,20 +50,6 @@ namespace ROCKSDB_NAMESPACE {
     targetFrequencyNode->AddKey(keyNode);
   }
 
-  lfu_frequency_node::~lfu_frequency_node() {
-    if (!this->prev && !this->next) {
-      return;
-    }
-
-    if (this->prev) {
-      this->prev->next = this->next;
-    }
-
-    if (this->next) {
-      this->next->prev = this->prev;
-    }
-  }
-
   lfu_policy::lfu_policy(uint64_t capacity) {
     map = new robin_hood::unordered_map<string, lfu_key_node*>(capacity);
     frequencies = nullptr;
@@ -84,6 +70,7 @@ namespace ROCKSDB_NAMESPACE {
       }
 
       frequencyNode = newFrequencyNode;
+      frequencies = frequencyNode;
     }
 
     frequencyNode->AddKey(keyNode);
@@ -105,7 +92,7 @@ namespace ROCKSDB_NAMESPACE {
     frequencyNode->ExchangeKey(keyNode, newFrequencyNode);
 
     if (!frequencyNode->keys) {
-      delete frequencyNode;
+        DeleteFrequencyNode(frequencyNode);
     }
   }
 
@@ -140,7 +127,7 @@ namespace ROCKSDB_NAMESPACE {
 
     frequencies = nodeToDelete->next;
     if (nodeToDelete->prev) {
-      nodeToDelete->prev->next = nodeToDelete->next;
+      nodeToDelete->prev->next = frequencies;
     }
     if (nodeToDelete->next) {
       nodeToDelete->next->prev = nodeToDelete->prev;
@@ -199,7 +186,7 @@ namespace ROCKSDB_NAMESPACE {
       res = this->map->at(key);
       policy->MarkAccess(key);
       RecordTick(stats_, LOOKASIDE_CACHE_HIT);
-    } catch(const std::out_of_range& e) {
+    } catch(const out_of_range& e) {
       if (markMiss) {
         RecordTick(stats_, LOOKASIDE_CACHE_MISS);
       }
@@ -216,11 +203,11 @@ namespace ROCKSDB_NAMESPACE {
     }
 
     if (map->size() == capacity) {
-      policy->Evict();
+      map->erase(policy->Evict());
       RecordTick(stats_, LOOKASIDE_CACHE_EVICTION);
     }
 
-    (*this->map)[key] = value;
+    (*map)[key] = value;
     policy->MarkInsertion(key);
   }
 

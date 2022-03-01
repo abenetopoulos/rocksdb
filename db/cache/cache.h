@@ -49,8 +49,6 @@ namespace ROCKSDB_NAMESPACE {
     void AddKey(lfu_key_node *keyNode);
     void RemoveKey(lfu_key_node *keyNode);
     void ExchangeKey(lfu_key_node *keyNode, lfu_frequency_node *targetFrequencyNode);
-
-    ~lfu_frequency_node();
   };
 
   // An implementation of a constant-time LFU cache.
