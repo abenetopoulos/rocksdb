@@ -192,7 +192,7 @@ namespace ROCKSDB_NAMESPACE {
     Insert(key, value);
   }
 
-  string* cache::Lookup(string& key) {
+  string* cache::Lookup(string& key, bool markMiss) {
     string* res;
 
     try {
@@ -200,7 +200,9 @@ namespace ROCKSDB_NAMESPACE {
       policy->MarkAccess(key);
       RecordTick(stats_, LOOKASIDE_CACHE_HIT);
     } catch(const std::out_of_range& e) {
-      RecordTick(stats_, LOOKASIDE_CACHE_MISS);
+      if (markMiss) {
+        RecordTick(stats_, LOOKASIDE_CACHE_MISS);
+      }
       return nullptr;
     }
 
@@ -208,7 +210,7 @@ namespace ROCKSDB_NAMESPACE {
   }
 
   void cache::Insert(string& key, string* value) {
-    if (Lookup(key)) {
+    if (Lookup(key, false)) {
       // TODO should we call `MarkAccess()` here?
       return;
     }
@@ -225,7 +227,7 @@ namespace ROCKSDB_NAMESPACE {
   void cache::Update(Slice& keySlice, string* updatedValue) {
     string key = keySlice.ToString();
 
-    if (Lookup(key)) {
+    if (Lookup(key, false)) {
       // TODO should we call `MarkAccess()` here?
       return;
     }

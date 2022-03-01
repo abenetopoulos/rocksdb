@@ -100,7 +100,7 @@ namespace ROCKSDB_NAMESPACE {
     void Insert(Slice &keySlice, string* value);
     // void Update(Slice& keySlice, Slice& updatedValueSlice);
 
-    string* Lookup(string& key);
+    string* Lookup(string& key, bool markMiss = true);
     void Insert(string& key, string* value);
     void Update(Slice& keySlice, string* updatedValue);
   };
