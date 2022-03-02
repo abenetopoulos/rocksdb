@@ -22,6 +22,9 @@ namespace ROCKSDB_NAMESPACE {
 
     keyNode->prev = nullptr;
     keyNode->next = keys;
+    if (keys) {
+      keys->prev = keyNode;
+    }
 
     keys = keyNode;
   }
