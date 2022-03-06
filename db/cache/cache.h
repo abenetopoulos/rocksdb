@@ -14,11 +14,19 @@ using namespace std;
 #define DEFAULT_CACHE_SIZE 1024
 
 namespace ROCKSDB_NAMESPACE {
+  struct cache_entry {
+    string *value;
+    void *extra;
+
+    cache_entry(string *v): value(v) { }
+  };
+
   // TODO consider making this a template
   struct eviction_policy {
-    virtual void MarkInsertion(string& key) = 0;
+    virtual void MarkInsertion(string& key, cache_entry *cacheEntry) = 0;
     virtual void MarkAccess(string& key) = 0;
     virtual string Evict() = 0;
+    virtual string Evict(cache_entry *cacheEntry) = 0;
 
     virtual ~eviction_policy() { }
   };
@@ -63,11 +71,16 @@ namespace ROCKSDB_NAMESPACE {
 
     lfu_policy(uint64_t capacity);
 
-    void MarkInsertion(string& key);
+    void MarkInsertion(string& key, cache_entry *cacheEntry);
     void MarkAccess(string& key);
+
     string Evict();
+    string Evict(cache_entry *cacheEntry);
+    string EvictKeyNode(lfu_key_node *keyNode);
+
     void DeleteFrequencyNode(lfu_frequency_node* frequencyNode);
   };
+
 
   // TODOs (in priority order)
   // - Support more policies: for now, we can either switch the type of the `policy` member to be
@@ -78,8 +91,7 @@ namespace ROCKSDB_NAMESPACE {
   // - consider turning this into a template to parameterize the value type
   struct cache {
     static const string NOT_FOUND;
-    // robin_hood::unordered_map<string, string> *map;
-    robin_hood::unordered_map<string, string*> *map;
+    robin_hood::unordered_map<string, cache_entry*> *map;
     uint64_t capacity;
 
     // NOTE this is here simply because I am lazy.
@@ -98,8 +110,9 @@ namespace ROCKSDB_NAMESPACE {
     void Insert(Slice &keySlice, string* value);
     // void Update(Slice& keySlice, Slice& updatedValueSlice);
 
-    string* Lookup(string& key, bool markMiss = true);
+    cache_entry* Lookup(string& key, bool markMiss = true);
     void Insert(string& key, string* value);
     void Update(Slice& keySlice, string* updatedValue);
+    void Remove(Slice& keySlice);
   };
 }

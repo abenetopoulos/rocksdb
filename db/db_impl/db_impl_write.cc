@@ -104,6 +104,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
          disable_memtable);
 
   if (write_options.low_pri) {
+    // TODO(achilles) @investigate: do we need to do anything in this case?
     Status s = ThrottleLowPriWritesIfNeeded(write_options, my_batch);
     if (!s.ok()) {
       return s;
@@ -1999,6 +2000,7 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   assert(ts_sz == column_family->GetComparator()->timestamp_size());
   WriteBatch batch;
   Status s;
+
   if (key.data() + key.size() == ts->data()) {
     Slice key_with_ts = Slice(key.data(), key.size() + ts_sz);
     s = batch.Put(column_family, key_with_ts, value);
@@ -2012,7 +2014,15 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   if (!s.ok()) {
     return s;
   }
-  return Write(opt, &batch);
+
+  s = Write(opt, &batch);
+  cache *lookasideCache = ((DBImpl*) this)->lookasideCache;
+  if (s.ok() && lookasideCache) {
+    Slice nonConstKey = Slice(key.data(), key.size());
+    lookasideCache->Remove(nonConstKey);
+  }
+
+  return s;
 }
 
 Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,

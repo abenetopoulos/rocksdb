@@ -1,4 +1,5 @@
 #include "cache.h"
+#include <stdexcept>
 
 namespace ROCKSDB_NAMESPACE {
   lfu_key_node::lfu_key_node(string k): key(k) {
@@ -58,7 +59,7 @@ namespace ROCKSDB_NAMESPACE {
     frequencies = nullptr;
   }
 
-  void lfu_policy::MarkInsertion(string& key) {
+  void lfu_policy::MarkInsertion(string& key, cache_entry *cacheEntry) {
     lfu_key_node *keyNode = new lfu_key_node(key);
     (*map)[key] = keyNode;
 
@@ -77,6 +78,8 @@ namespace ROCKSDB_NAMESPACE {
     }
 
     frequencyNode->AddKey(keyNode);
+
+    cacheEntry->extra = (void *) keyNode;
   }
 
   void lfu_policy::MarkAccess(string& key) {
@@ -99,13 +102,8 @@ namespace ROCKSDB_NAMESPACE {
     }
   }
 
-  string lfu_policy::Evict() {
-    if (!frequencies || !frequencies->keys) {
-      return NO_FREQUENCY_INFO;
-    }
 
-    lfu_key_node* nodeToEvict = frequencies->keys;
-
+  string lfu_policy::EvictKeyNode(lfu_key_node *nodeToEvict) {
     string res = nodeToEvict->key;
     frequencies->keys = nodeToEvict->next;
     if (nodeToEvict->next) {
@@ -123,6 +121,24 @@ namespace ROCKSDB_NAMESPACE {
     }
 
     return res;
+  }
+
+  string lfu_policy::Evict() {
+    if (!frequencies || !frequencies->keys) {
+      return NO_FREQUENCY_INFO;
+    }
+
+    lfu_key_node* nodeToEvict = frequencies->keys;
+    return EvictKeyNode(nodeToEvict);
+  }
+
+  string lfu_policy::Evict(cache_entry *cacheEntry) {
+    if (!cacheEntry->extra) {
+      return "";  // TODO appropriate return value
+    }
+
+    lfu_key_node* nodeToEvict = (lfu_key_node *) cacheEntry->extra;
+    return EvictKeyNode(nodeToEvict);
   }
 
   void lfu_policy::DeleteFrequencyNode(lfu_frequency_node* frequencyNode) {
@@ -144,13 +160,13 @@ namespace ROCKSDB_NAMESPACE {
   cache::cache(): cache(DEFAULT_CACHE_SIZE) { }
 
   cache::cache(uint64_t c): capacity(c) {
-    map = new robin_hood::unordered_map<string, string*>(capacity);
+    map = new robin_hood::unordered_map<string, cache_entry*>(capacity);
     policy = new lfu_policy(capacity);
   }
 
   cache::cache(cache_options &options) {
     capacity = options.numEntries;
-    map = new robin_hood::unordered_map<string, string*>(capacity);
+    map = new robin_hood::unordered_map<string, cache_entry*>(capacity);
 
     switch (options.policy) {
       case lookaside_cache_policy::CACHE_POLICY_LFU:
@@ -164,12 +180,16 @@ namespace ROCKSDB_NAMESPACE {
 
   string* cache::Lookup(LookupKey &lkey) {
     string key = lkey.user_key().ToString();
-    return Lookup(key);
+    cache_entry *res = Lookup(key);
+
+    return res ? res->value : nullptr;
   }
 
   string* cache::Lookup(Slice &keySlice) {
     string key = keySlice.ToString();
-    return Lookup(key);
+    cache_entry *res = Lookup(key);
+
+    return res ? res->value : nullptr;
   }
 
   void cache::Insert(LookupKey &lkey, string* value) {
@@ -182,8 +202,8 @@ namespace ROCKSDB_NAMESPACE {
     Insert(key, value);
   }
 
-  string* cache::Lookup(string& key, bool markMiss) {
-    string* res;
+  cache_entry* cache::Lookup(string& key, bool markMiss) {
+    cache_entry *res;
 
     try {
       res = this->map->at(key);
@@ -210,21 +230,38 @@ namespace ROCKSDB_NAMESPACE {
       RecordTick(stats_, LOOKASIDE_CACHE_EVICTION);
     }
 
-    (*map)[key] = value;
-    policy->MarkInsertion(key);
+    cache_entry *newEntry = new cache_entry(value);
+    (*map)[key] = newEntry;
+    policy->MarkInsertion(key, newEntry);
   }
 
   void cache::Update(Slice& keySlice, string* updatedValue) {
     string key = keySlice.ToString();
 
-    if (Lookup(key, false)) {
+    cache_entry *maybeEntry = Lookup(key, false);
+    if (!maybeEntry) {
       // TODO should we call `MarkAccess()` here?
       return;
     }
 
-    (*this->map)[key] = updatedValue;
+    maybeEntry->value = updatedValue;
     policy->MarkAccess(key);
   }
 
   const string cache::NOT_FOUND = "ECACHENOTFOUND";
+
+  void cache::Remove(Slice& keySlice) {
+    string key = keySlice.ToString();
+    cache_entry *maybeEntry = Lookup(key, false);
+    if (!maybeEntry) {
+      return;
+    }
+
+    if (!policy->Evict(maybeEntry).size()) {
+      // TODO
+      throw std::runtime_error("Failed to evict key node for key");
+    }
+
+    delete maybeEntry;
+  }
 }
