@@ -2060,7 +2060,15 @@ Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   if (!s.ok()) {
     return s;
   }
-  return Write(opt, &batch);
+
+  s = Write(opt, &batch);
+  cache *lookasideCache = ((DBImpl*) this)->lookasideCache;
+  if (s.ok() && lookasideCache) {
+    Slice nonConstKey = Slice(key.data(), key.size());
+    lookasideCache->Remove(nonConstKey);
+  }
+
+  return s;
 }
 
 Status DB::SingleDelete(const WriteOptions& opt,
@@ -2094,6 +2102,13 @@ Status DB::SingleDelete(const WriteOptions& opt,
     return s;
   }
   s = Write(opt, &batch);
+
+  cache *lookasideCache = ((DBImpl*) this)->lookasideCache;
+  if (s.ok() && lookasideCache) {
+    Slice nonConstKey = Slice(key.data(), key.size());
+    lookasideCache->Remove(nonConstKey);
+  }
+
   return s;
 }
 
