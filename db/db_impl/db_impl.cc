@@ -282,11 +282,11 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
     wbm_stall_.reset(new WBMStallInterface());
   }
 
-  if (options.use_lookaside_cache) {
-      cache_options cacheOptions = cache_options();
-      cacheOptions.UpdateFromEnv();
-      lookasideCache = new cache(cacheOptions);
+  cache_options cacheOptions = cache_options();
+  cacheOptions.UpdateFromEnv();
 
+  if (cacheOptions.useLookasideCache) {
+      lookasideCache = new cache(cacheOptions);
       lookasideCache->stats_ = immutable_db_options_.stats;
   }
 }

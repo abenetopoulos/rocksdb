@@ -696,8 +696,13 @@ void cache_options::UpdateFromEnv() {
       // Do nothing, just default to LFU policy for now.
     }
   }
+
+  if ((val = std::getenv(useLookasideCacheKey.c_str())) != nullptr) {
+    useLookasideCache = strcmp(val, "0") ? true : false;
+  }
 }
 
+const std::string cache_options::useLookasideCacheKey = "LA_CACHE_ENABLE";
 const std::string cache_options::numEntriesKey = "LA_CACHE_N_ENTRIES";
 const std::string cache_options::policyKey = "LA_CACHE_POLICY";
 

@@ -1356,7 +1356,6 @@ struct DBOptions {
   // Default: kNonVolatileBlockTier
   CacheTier lowest_used_cache_tier = CacheTier::kNonVolatileBlockTier;
 
-  bool use_lookaside_cache = true;
 };
 
 // Options to control the behavior of a database (passed to DB::Open)
@@ -1928,24 +1927,26 @@ struct LiveFilesStorageInfoOptions {
 
 
 enum lookaside_cache_policy {
-    CACHE_POLICY_LFU = 0,
-    CACHE_POLICY_NUM,
+  CACHE_POLICY_LFU = 0,
+  CACHE_POLICY_NUM,
 };
 
 static std::unordered_map<std::string,lookaside_cache_policy>
 const policyTable = {
-    {"lfu",lookaside_cache_policy::CACHE_POLICY_LFU},
+  {"lfu",lookaside_cache_policy::CACHE_POLICY_LFU},
 };
 
 
 struct cache_options {
-    uint64_t numEntries = 1024;
-    lookaside_cache_policy policy = lookaside_cache_policy::CACHE_POLICY_LFU;
+  bool useLookasideCache = true;
+  uint64_t numEntries = 1024;
+  lookaside_cache_policy policy = lookaside_cache_policy::CACHE_POLICY_LFU;
 
-    static const std::string numEntriesKey;
-    static const std::string policyKey;
+  static const std::string useLookasideCacheKey;
+  static const std::string numEntriesKey;
+  static const std::string policyKey;
 
-    void UpdateFromEnv();
+  void UpdateFromEnv();
 };
 
 }  // namespace ROCKSDB_NAMESPACE
