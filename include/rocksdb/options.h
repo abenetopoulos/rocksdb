@@ -1680,6 +1680,10 @@ struct WriteOptions {
   // and the API is subject to change.
   const Slice* timestamp;
 
+  // default: true
+  bool invalidate_cache_on_write;
+  static const std::string invalidate_cache_on_write_key;
+
   WriteOptions()
       : sync(false),
         disableWAL(false),
@@ -1687,7 +1691,14 @@ struct WriteOptions {
         no_slowdown(false),
         low_pri(false),
         memtable_insert_hint_per_batch(false),
-        timestamp(nullptr) {}
+        timestamp(nullptr),
+        invalidate_cache_on_write(true) {
+          // NOTE(achilles) yuck
+          char* val;
+          if ((val = std::getenv(invalidate_cache_on_write_key.c_str())) != nullptr) {
+            invalidate_cache_on_write = strcmp(val, "0") ? true : false;
+          }
+        }
 };
 
 // Options that control flush operations

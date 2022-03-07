@@ -702,6 +702,7 @@ void cache_options::UpdateFromEnv() {
   }
 }
 
+const std::string WriteOptions::invalidate_cache_on_write_key = "LA_CACHE_INVALIDATE_ON_WRITE";
 const std::string cache_options::useLookasideCacheKey = "LA_CACHE_ENABLE";
 const std::string cache_options::numEntriesKey = "LA_CACHE_N_ENTRIES";
 const std::string cache_options::policyKey = "LA_CACHE_POLICY";

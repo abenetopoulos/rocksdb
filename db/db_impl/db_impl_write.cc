@@ -2019,7 +2019,14 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   cache *lookasideCache = ((DBImpl*) this)->lookasideCache;
   if (s.ok() && lookasideCache) {
     Slice nonConstKey = Slice(key.data(), key.size());
-    lookasideCache->Remove(nonConstKey);
+
+    if (opt.invalidate_cache_on_write) {
+      lookasideCache->Remove(nonConstKey);
+    } else {
+      // TODO(achilles) @memory
+      std::string *newValue = new std::string(value.data());
+      lookasideCache->Update(nonConstKey, newValue);
+    }
   }
 
   return s;
