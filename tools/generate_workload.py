@@ -35,6 +35,7 @@ _OUTPUT_FILE_FLAG = '--output'
 _NUM_KEYS_FLAG = '--num-keys'
 _NUM_OPS_FLAG = '--num-ops'
 _PERCENTAGE_READS_FLAG = '--percentage-reads'
+_MAX_READ_DISTANCE_FLAG = '--max-read-distance'
 
 _DEFAULT_OUTPUT_FILE = '/tmp/rocksdb/workload'
 
@@ -99,6 +100,7 @@ class Parameters:
             self.num_ops = 10 * self.num_keys
 
         self.percentage_reads = decimal.Decimal(arguments[_PERCENTAGE_READS_FLAG])
+        self.max_read_distance = decimal.Decimal(arguments[_MAX_READ_DISTANCE_FLAG])
 
     def _open_output_file(self):
         self._output_file = open(self.output_path, 'w')
@@ -222,13 +224,15 @@ def generate_workload(workload_parameters: Parameters):
     #   - max read distance
 
     # set of keys that are present at any given point in the db
-    valid_keys = generate_preamble(workload_parameters)
+    preamble_keys = generate_preamble(workload_parameters)
     write_output(workload_parameters, 'end preamble')
+    written_keys_and_locations = {k: 0 for k in preamble_keys}
 
     n_commands_written = 0
     n_commands_reads = 0
 
     target_percentage_reads = workload_parameters.percentage_reads
+    max_read_distance = workload_parameters.max_read_distance
     distribution = {CommandKind.READ: target_percentage_reads}
 
     # NOTE consider replacing this whole thing with a call to
@@ -247,14 +251,21 @@ def generate_workload(workload_parameters: Parameters):
 
             if command_kind is CommandKind.WRITE:
                 command_value = generate_command_value()
-                valid_keys.add(command_key)
+                written_keys_and_locations[command_key] = n_commands_written + 1
 
                 break
             elif command_kind is CommandKind.DELETE:
-                if command_key in valid_keys:
-                    valid_keys.remove(command_key)
+                if command_key in written_keys_and_locations:
+                    del written_keys_and_locations[command_key]
                     break
             else:
+                valid_keys = set(
+                    [
+                        key for key, write_location in written_keys_and_locations.items()
+                        if write_location + max_read_distance >= n_commands_written + 1
+                    ],
+                )
+
                 if command_key in valid_keys:
                     n_commands_reads += 1
                     break
@@ -271,6 +282,12 @@ def generate_workload(workload_parameters: Parameters):
             decimal.Decimal(n_commands_reads) / decimal.Decimal(n_commands_written) <= target_percentage_reads
         ):
             read_key = generate_key_uniform(workload_parameters)
+            valid_keys = set(
+                [
+                    key for key, write_location in written_keys_and_locations.items()
+                    if write_location + max_read_distance >= n_commands_written + 1
+                ],
+            )
             if read_key not in valid_keys:
                 continue
 
