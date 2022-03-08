@@ -133,7 +133,7 @@ def write_output(workload_parameters: Parameters, output: str):
 
 
 def generate_command_kind_uniform(pool: List[CommandKind]) -> CommandKind:
-    return pool[random.randint(0, len(pool) - 1)]
+    return pool[int(len(pool) * random.random())]
 
 
 def _calculate_probability_list(
@@ -191,7 +191,7 @@ def generate_command_kind_list(
 
 
 def generate_key_uniform(workload_parameters: Parameters) -> str:
-    rnd = random.randint(0, workload_parameters.num_keys - 1)
+    rnd = int(workload_parameters.num_keys * random.random())
 
     return _KEY_TEMPLATE.format(rnd)
 
@@ -220,12 +220,11 @@ def generate_preamble(workload_parameters: Parameters) -> Set[str]:
 
 
 def generate_workload(workload_parameters: Parameters):
-    # TODO
-    #   - max read distance
-
     # set of keys that are present at any given point in the db
     preamble_keys = generate_preamble(workload_parameters)
     write_output(workload_parameters, 'end preamble')
+
+    valid_read_keys = preamble_keys
     written_keys_and_locations = {k: 0 for k in preamble_keys}
 
     n_commands_written = 0
@@ -239,6 +238,7 @@ def generate_workload(workload_parameters: Parameters):
     # `generate_command_kind_list()` and then just iterating over that
     # and generating the keys. Downside: since there is no way to build it
     # using a generator, it will be terrible for large values of `num_keys`.
+    last_written_key = next(iter(preamble_keys))
     while n_commands_written < workload_parameters.num_ops:
         while True:
             command_kind = generate_command_kind()
@@ -252,21 +252,21 @@ def generate_workload(workload_parameters: Parameters):
             if command_kind is CommandKind.WRITE:
                 command_value = generate_command_value()
                 written_keys_and_locations[command_key] = n_commands_written + 1
+                valid_read_keys.add(command_key)
+                last_written_key = command_key
 
                 break
             elif command_kind is CommandKind.DELETE:
                 if command_key in written_keys_and_locations:
                     del written_keys_and_locations[command_key]
+                    valid_read_keys.remove(command_key)
+
                     break
             else:
-                valid_keys = set(
-                    [
-                        key for key, write_location in written_keys_and_locations.items()
-                        if write_location + max_read_distance >= n_commands_written + 1
-                    ],
-                )
-
-                if command_key in valid_keys:
+                if (
+                    command_key in written_keys_and_locations and
+                    written_keys_and_locations[command_key] + max_read_distance >= n_commands_written + 1
+                ):
                     n_commands_reads += 1
                     break
 
@@ -275,21 +275,23 @@ def generate_workload(workload_parameters: Parameters):
 
         n_commands_written += 1
 
+        n_retries = 0
         # NOTE ugly, but ok for now. This is not the best calculation really,
         # but it gets us near to where we want to be
         while (
             n_commands_written < workload_parameters.num_ops and
             decimal.Decimal(n_commands_reads) / decimal.Decimal(n_commands_written) <= target_percentage_reads
         ):
+            n_retries += 1
             read_key = generate_key_uniform(workload_parameters)
-            valid_keys = set(
-                [
-                    key for key, write_location in written_keys_and_locations.items()
-                    if write_location + max_read_distance >= n_commands_written + 1
-                ],
-            )
-            if read_key not in valid_keys:
-                continue
+            if (
+                read_key not in written_keys_and_locations or
+                written_keys_and_locations[read_key] + max_read_distance < n_commands_written + 1
+            ):
+                if n_retries < 5:
+                    continue
+
+                read_key = last_written_key
 
             command = Command(CommandKind.READ, read_key)
             write_output(workload_parameters, command.to_str())
