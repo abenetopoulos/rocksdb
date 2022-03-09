@@ -1,7 +1,9 @@
 #pragma once
 
 #include "db/lookup_key.h"
+#include "db/cache/cache_entry.h"
 #include "robin_hood.h"
+#include "policies/lfu_policy.h"
 #include "monitoring/statistics.h"
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
@@ -14,74 +16,7 @@ using namespace std;
 #define DEFAULT_CACHE_SIZE 1024
 
 namespace ROCKSDB_NAMESPACE {
-  struct cache_entry {
-    string *value;
-    void *extra;
-
-    cache_entry(string *v): value(v) { }
-  };
-
-  // TODO consider making this a template
-  struct eviction_policy {
-    virtual void MarkInsertion(string& key, cache_entry *cacheEntry) = 0;
-    virtual void MarkAccess(string& key) = 0;
-    virtual string Evict() = 0;
-    virtual string Evict(cache_entry *cacheEntry) = 0;
-
-    virtual ~eviction_policy() { }
-  };
-
-  struct lfu_frequency_node;
-
-  struct lfu_key_node {
-    string key;
-
-    lfu_key_node *prev;
-    lfu_key_node *next;
-    lfu_frequency_node *frequencyNode;
-
-    lfu_key_node(string);
-  };
-
-  struct lfu_frequency_node {
-    uint64_t frequency;
-
-    lfu_frequency_node *prev;
-    lfu_frequency_node *next;
-
-    lfu_key_node *keys;
-
-    lfu_frequency_node();
-    lfu_frequency_node(uint64_t f);
-
-    void AddKey(lfu_key_node *keyNode);
-    void RemoveKey(lfu_key_node *keyNode);
-    void ExchangeKey(lfu_key_node *keyNode, lfu_frequency_node *targetFrequencyNode);
-  };
-
-  // An implementation of a constant-time LFU cache.
-  // http://dhruvbird.com/lfu.pdf
-  struct lfu_policy: eviction_policy {
-    // TODO
-    //  - sanitize memory accesses to avoid null-ptr derefs
-    static const string NO_FREQUENCY_INFO;
-
-    robin_hood::unordered_map<string, lfu_key_node*> *map;
-    lfu_frequency_node *frequencies;
-
-    lfu_policy(uint64_t capacity);
-
-    void MarkInsertion(string& key, cache_entry *cacheEntry);
-    void MarkAccess(string& key);
-
-    string Evict();
-    string Evict(cache_entry *cacheEntry);
-    string EvictKeyNode(lfu_key_node *keyNode);
-
-    void DeleteFrequencyNode(lfu_frequency_node* frequencyNode);
-  };
-
-
+  struct cache_entry;
   // TODOs (in priority order)
   // - Support more policies: for now, we can either switch the type of the `policy` member to be
   //    `eviction_policy*`, _or_ we can have one member for each policy

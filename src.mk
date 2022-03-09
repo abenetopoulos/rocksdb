@@ -23,6 +23,7 @@ LIB_SOURCES =                                                   \
   db/builder.cc                                                 \
   db/c.cc                                                       \
   db/cache/cache.cc                                             \
+  db/cache/policies/lfu_policy.cc                               \
   db/column_family.cc                                           \
   db/compaction/compaction.cc                                   \
   db/compaction/compaction_iterator.cc                          \
