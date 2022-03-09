@@ -6,21 +6,14 @@ namespace ROCKSDB_NAMESPACE {
 
   cache::cache(uint64_t c): capacity(c) {
     map = new robin_hood::unordered_map<string, cache_entry*>(capacity);
-    policy = new lfu_policy(capacity);
+    policy = new LAC_POLICY_C(capacity);
   }
 
   cache::cache(cache_options &options) {
     capacity = options.numEntries;
     map = new robin_hood::unordered_map<string, cache_entry*>(capacity);
 
-    switch (options.policy) {
-      case lookaside_cache_policy::CACHE_POLICY_LFU:
-      default:  // temporary
-        {
-          policy = new lfu_policy(capacity);
-          break;
-        }
-    }
+    policy = new LAC_POLICY_C(capacity);
   }
 
   string* cache::Lookup(LookupKey &lkey) {

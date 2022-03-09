@@ -4,6 +4,7 @@
 #include "db/cache/cache_entry.h"
 #include "robin_hood.h"
 #include "policies/lfu_policy.h"
+#include "policies/lru_policy.h"
 #include "monitoring/statistics.h"
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
@@ -14,6 +15,14 @@ using namespace std;
 
 // default capacity for cache in terms of number of entries
 #define DEFAULT_CACHE_SIZE 1024
+
+#ifdef LAC_POLICY_LRU
+#define LAC_POLICY lru_policy
+#define LAC_POLICY_C(c) lru_policy()
+#else
+#define LAC_POLICY lfu_policy
+#define LAC_POLICY_C(c) lfu_policy((c))
+#endif
 
 namespace ROCKSDB_NAMESPACE {
   struct cache_entry;
@@ -32,7 +41,7 @@ namespace ROCKSDB_NAMESPACE {
     // NOTE this is here simply because I am lazy.
     Statistics* stats_;
 
-    lfu_policy *policy;
+    LAC_POLICY *policy;
 
     cache();
     cache(uint64_t c);

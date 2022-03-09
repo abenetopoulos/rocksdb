@@ -101,6 +101,17 @@ ifeq ($(filter -DROCKSDB_LITE,$(OPT)),)
 endif
 endif
 
+# Lookaside-cache build flag.
+LAC_POLICY ?= "LFU"
+ifeq ($(LAC_POLICY), "LRU")
+	OPT += -DLAC_POLICY_LRU
+else
+	OPT += -DLAC_POLICY_LFU
+endif
+
+$(info Cache policy flag is ${OPT})
+
+
 # Figure out optimize level.
 ifneq ($(DEBUG_LEVEL), 2)
 ifeq ($(LITE), 0)
