@@ -27,11 +27,6 @@ using namespace std;
 namespace ROCKSDB_NAMESPACE {
   struct cache_entry;
   // TODOs (in priority order)
-  // - Support more policies: for now, we can either switch the type of the `policy` member to be
-  //    `eviction_policy*`, _or_ we can have one member for each policy
-  //    type, and instantiate/use the appropriate one based on the policy
-  //    we get passed at init. Performance-wise, the second solution should
-  //    be better (avoiding vtable lookups etc.), but it is uglier.
   // - consider turning this into a template to parameterize the value type
   struct cache {
     static const string NOT_FOUND;
@@ -52,7 +47,6 @@ namespace ROCKSDB_NAMESPACE {
     string* Lookup(Slice &keySlice);
     void Insert(LookupKey &lkey, string* value);
     void Insert(Slice &keySlice, string* value);
-    // void Update(Slice& keySlice, Slice& updatedValueSlice);
 
     cache_entry* Lookup(string& key, bool markMiss = true);
     void Insert(string& key, string* value);
