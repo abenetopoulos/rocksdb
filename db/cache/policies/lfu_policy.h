@@ -48,7 +48,7 @@ namespace ROCKSDB_NAMESPACE {
     lfu_policy(uint64_t capacity);
 
     void MarkInsertion(string& key, cache_entry *cacheEntry);
-    void MarkAccess(string& key);
+    void MarkAccess(string& key, cache_entry *cacheEntry);
 
     string Evict();
     string Evict(cache_entry *cacheEntry);

@@ -81,7 +81,7 @@ namespace ROCKSDB_NAMESPACE {
     cacheEntry->extra = (void *) keyNode;
   }
 
-  void lfu_policy::MarkAccess(string& key) {
+  void lfu_policy::MarkAccess(string& key, cache_entry *cacheEntry) {
     lfu_key_node* keyNode = (*map)[key];
     lfu_frequency_node* frequencyNode = keyNode->frequencyNode;
 

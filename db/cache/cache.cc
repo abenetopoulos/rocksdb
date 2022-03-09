@@ -52,7 +52,7 @@ namespace ROCKSDB_NAMESPACE {
 
     try {
       res = this->map->at(key);
-      policy->MarkAccess(key);
+      policy->MarkAccess(key, res);
       RecordTick(stats_, LOOKASIDE_CACHE_HIT);
     } catch(const out_of_range& e) {
       if (markMiss) {
@@ -90,7 +90,7 @@ namespace ROCKSDB_NAMESPACE {
     }
 
     maybeEntry->value = updatedValue;
-    policy->MarkAccess(key);
+    policy->MarkAccess(key, maybeEntry);
   }
 
   const string cache::NOT_FOUND = "ECACHENOTFOUND";

@@ -1939,12 +1939,14 @@ struct LiveFilesStorageInfoOptions {
 
 enum lookaside_cache_policy {
   CACHE_POLICY_LFU = 0,
+  CACHE_POLICY_LRU,
   CACHE_POLICY_NUM,
 };
 
 static std::unordered_map<std::string,lookaside_cache_policy>
 const policyTable = {
   {"lfu",lookaside_cache_policy::CACHE_POLICY_LFU},
+  {"lru",lookaside_cache_policy::CACHE_POLICY_LRU},
 };
 
 
