@@ -285,10 +285,10 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   cache_options cacheOptions = cache_options();
   cacheOptions.UpdateFromEnv();
 
-  if (cacheOptions.useLookasideCache) {
+#ifdef LAC_ENABLE
       lookasideCache = new cache(cacheOptions);
       lookasideCache->stats_ = immutable_db_options_.stats;
-  }
+#endif
 }
 
 Status DBImpl::Resume() {
@@ -1836,16 +1836,16 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
   PERF_TIMER_STOP(get_snapshot_time);
 
 
-  if (lookasideCache) {
-    std::string* cache_result = lookasideCache->Lookup(lkey);
+#ifdef LAC_ENABLE
+  std::string* cache_result = lookasideCache->Lookup(lkey);
 
-    if (cache_result) {
-      // TODO(achilles): ensure pointer sanity (memcpy necessary?)
-      std::string* value = get_impl_options.value->GetSelf();
-      value->assign(*cache_result);
-      return Status::OK();
-    }
+  if (cache_result) {
+    // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+    std::string* value = get_impl_options.value->GetSelf();
+    value->assign(*cache_result);
+    return Status::OK();
   }
+#endif
 
   bool skip_memtable = (read_options.read_tier == kPersistedTier &&
                         has_unpersisted_data_.load(std::memory_order_relaxed));
@@ -1862,7 +1862,9 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
         get_impl_options.value->PinSelf();
 
         // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+#ifdef LAC_ENABLE
         lookasideCache->Insert(lkey, get_impl_options.value->GetSelf());
+#endif
 
         RecordTick(stats_, MEMTABLE_HIT);
       } else if ((s.ok() || s.IsMergeInProgress()) &&
@@ -1875,7 +1877,9 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
         get_impl_options.value->PinSelf();
 
         // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+#ifdef LAC_ENABLE
         lookasideCache->Insert(lkey, get_impl_options.value->GetSelf());
+#endif
 
         RecordTick(stats_, MEMTABLE_HIT);
       }
@@ -1914,7 +1918,10 @@ Status DBImpl::GetImpl(const ReadOptions& read_options, const Slice& key,
         get_impl_options.get_value);
 
     // TODO(achilles): ensure pointer sanity (memcpy necessary?)
+
+#ifdef LAC_ENABLE
     lookasideCache->Insert(lkey, get_impl_options.value->GetSelf());
+#endif
 
     RecordTick(stats_, MEMTABLE_MISS);
   }
