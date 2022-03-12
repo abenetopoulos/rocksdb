@@ -103,8 +103,10 @@ namespace ROCKSDB_NAMESPACE {
 
 
   string lfu_policy::EvictKeyNode(lfu_key_node *nodeToEvict) {
+    lfu_frequency_node *correspondingFrequencyNode = nodeToEvict->frequencyNode;
     string res = nodeToEvict->key;
-    frequencies->keys = nodeToEvict->next;
+
+    correspondingFrequencyNode->keys = nodeToEvict->next;
     if (nodeToEvict->next) {
       nodeToEvict->next->prev = nodeToEvict->prev;
     }
@@ -115,8 +117,8 @@ namespace ROCKSDB_NAMESPACE {
     map->erase(nodeToEvict->key);
     delete nodeToEvict;
 
-    if (!frequencies->keys) {
-      DeleteFrequencyNode(frequencies);
+    if (!correspondingFrequencyNode->keys) {
+      DeleteFrequencyNode(correspondingFrequencyNode);
     }
 
     return res;
@@ -143,12 +145,14 @@ namespace ROCKSDB_NAMESPACE {
   void lfu_policy::DeleteFrequencyNode(lfu_frequency_node* frequencyNode) {
     lfu_frequency_node *nodeToDelete = frequencyNode;
 
-    frequencies = nodeToDelete->next;
     if (nodeToDelete->prev) {
-      nodeToDelete->prev->next = frequencies;
+      nodeToDelete->prev->next = nodeToDelete->next;
     }
     if (nodeToDelete->next) {
       nodeToDelete->next->prev = nodeToDelete->prev;
+    }
+    if (frequencies == nodeToDelete) {
+      frequencies = nodeToDelete->next;
     }
 
     delete nodeToDelete;
