@@ -78,7 +78,7 @@ namespace ROCKSDB_NAMESPACE {
 
     cache_entry *maybeEntry = Lookup(key, false);
     if (!maybeEntry) {
-      // TODO should we call `MarkAccess()` here?
+      Insert(key, updatedValue);
       return;
     }
 
