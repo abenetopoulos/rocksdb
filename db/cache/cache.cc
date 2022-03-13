@@ -63,7 +63,7 @@ namespace ROCKSDB_NAMESPACE {
       return;
     }
 
-    if (map->size() == capacity) {
+    while (map->size() >= capacity) {
       map->erase(policy->Evict());
       RecordTick(stats_, LOOKASIDE_CACHE_EVICTION);
     }

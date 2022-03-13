@@ -104,9 +104,9 @@ endif
 # Lookaside-cache build flag.
 LAC_POLICY ?= "LFU"
 ifeq ($(LAC_POLICY), "LRU")
-	OPT += -DLAC_POLICY_LRU
-else
-	OPT += -DLAC_POLICY_LFU
+	OPT += -DLAC_POLICY_LRU -DLAC_ENABLE
+else ifeq ($(LAC_POLICY), "LFU")
+	OPT += -DLAC_POLICY_LFU -DLAC_ENABLE
 endif
 
 $(info Cache policy flag is ${OPT})
