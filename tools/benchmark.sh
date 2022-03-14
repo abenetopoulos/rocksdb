@@ -36,6 +36,7 @@ function display_usage() {
   echo -e "\trevrangewhilemerging"
   echo -e "\trandomtransaction"
   echo -e "\tuniversal_compaction"
+  echo -e "\truncustomworkload"
   echo -e "\tdebug"
   echo ""
   echo "Enviroment Variables:"
@@ -624,6 +625,25 @@ function run_randomtransaction {
   eval $cmd
 }
 
+function run_runcustomworkload {
+  echo "Running custom workload"
+  log_file_name="${output_dir}/benchmark_runcustomworkload.t${num_threads}.log"
+  cmd="./db_bench --benchmarks=runcustomworkload \
+       --use_existing_db=1 \
+       $params_w \
+       --threads=$num_threads \
+       --seed=$( date +%s ) \
+       2>&1 | tee -a $log_file_name"
+  if [[ "$job_id" != "" ]]; then
+    echo "Job ID: ${job_id}" > $log_file_name
+    echo $cmd | tee -a $log_file_name
+  else
+    echo $cmd | tee $log_file_name
+  fi
+  eval $cmd
+  summarize_result $log_file_name runcustomworkload.t${num_threads} runcustomworkload
+}
+
 function now() {
   echo `date +"%s"`
 }
@@ -685,6 +705,8 @@ for job in ${jobs[@]}; do
     run_randomtransaction
   elif [ $job = universal_compaction ]; then
     run_univ_compaction
+  elif [ $job = runcustomworkload ]; then
+    run_runcustomworkload
   elif [ $job = debug ]; then
     num_keys=1000; # debug
     echo "Setting num_keys to $num_keys"

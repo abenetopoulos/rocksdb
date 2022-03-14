@@ -35,6 +35,7 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <iomanip>
 
 #include "db/db_impl/db_impl.h"
 #include "db/malloc_stats.h"
@@ -107,6 +108,8 @@ using GFLAGS_NAMESPACE::SetUsageMessage;
 #define IF_ROCKSDB_LITE(Then, Else) Else
 #endif
 
+#define FIXED_DOUBLE(d) std::fixed << std::setprecision(3) << (d)
+
 DEFINE_string(
     benchmarks,
     "fillseq,"
@@ -158,6 +161,7 @@ IF_ROCKSDB_LITE("",
     "randomreplacekeys,"
     "timeseries,"
     "getmergeoperands",
+    "runcustomworkload"
 
     "Comma-separated list of operations to run in the specified"
     " order. Available benchmarks:\n"
@@ -244,7 +248,8 @@ IF_ROCKSDB_LITE("",
     "key "
     "by doing a Get followed by binary searching in the large sorted list vs "
     "doing a GetMergeOperands and binary searching in the operands which are"
-    "sorted sub-lists. The MergeOperator used is sortlist.h\n");
+    "sorted sub-lists. The MergeOperator used is sortlist.h\n"
+    "\truncustomworkload -- Run a workload generated with tools/generate_workload.py\n");
 
 DEFINE_int64(num, 1000000, "Number of key/values to place in database");
 
@@ -317,6 +322,10 @@ DEFINE_int64(max_scan_distance, 0,
 DEFINE_bool(use_uint64_comparator, false, "use Uint64 user comparator");
 
 DEFINE_int64(batch_size, 1, "Batch size");
+
+DEFINE_string(custom_workload_path, "",
+              "Path to custom workload to run (valid only for the "
+              "`runcustomworkload` benchmark");
 
 static bool ValidateKeySize(const char* /*flagname*/, int32_t /*value*/) {
   return true;
@@ -3518,6 +3527,8 @@ class Benchmark {
 #endif  // ROCKSDB_LITE
       } else if (name == "getmergeoperands") {
         method = &Benchmark::GetMergeOperands;
+      } else if (name == "runcustomworkload") {
+        method = &Benchmark::RunCustomWorkload;
       } else if (!name.empty()) {  // No error message for empty name
         fprintf(stderr, "unknown benchmark '%s'\n", name.c_str());
         ErrorExit();
@@ -7411,6 +7422,125 @@ class Benchmark {
       std::cout << "List: " << to_print << " : " << *psl.GetSelf() << "\n";
       if (to_print++ > 2) break;
     }
+  }
+
+  std::string FormatDuration(uint64_t durationMicros) {
+    std::ostringstream res;
+    if (durationMicros < 1000) {
+      res << durationMicros << "μs";
+      return res.str();
+    }
+
+    uint64_t us = durationMicros % 1000;
+    double ms = durationMicros / 1000.0;
+    if (ms < 1000.0) {
+      res << FIXED_DOUBLE(ms) << "ms, " << us << "μs";
+      return res.str();
+    }
+
+    uint64_t s = floor(ms / 1000.0);
+    if (s < 60) {
+      res << s << "s, " << FIXED_DOUBLE(ms) << "ms, " << us << "μs";
+      return res.str();
+    }
+
+    uint64_t m = floor(s / 60);
+    s = s % 60;
+
+    res << m << "m, " << s << "s, " << FIXED_DOUBLE(ms) << "ms, " << us << "μs";
+    return res.str();
+  }
+
+  void RunCustomWorkload(ThreadState* thread) {
+    DB* db = SelectDB(thread);
+    std::string workloadFilePath = FLAGS_custom_workload_path;
+
+    if (workloadFilePath.empty()) {
+      fprintf(stderr,
+              "Cannot run a custom workload without a workload file (custom_workload_path).\n");
+      exit(1);
+    }
+
+    std::ifstream workloadInputStream;
+    workloadInputStream.open(workloadFilePath.c_str(), ios::in);
+    if (!workloadInputStream.is_open()) {
+      fprintf(stderr,
+              "Failed to open workload file '%s' for reading.\n", workloadFilePath.c_str());
+      exit(1);
+    }
+
+    // NOTE assume max line is 128 chars (should be __much__ shorter in practice)
+    uint8_t maxLineSize = 128;
+    char *line = (char *) malloc(maxLineSize * sizeof(char));
+
+    auto* clock = FLAGS_env->GetSystemClock().get();
+    uint64_t workloadStart = clock->NowMicros();
+
+    uint64_t operationStart;
+    uint64_t totalOperationDurationMicros = 0;
+
+    Status operationStatus;
+
+    ReadOptions readOptions;
+    WriteOptions writeOptions;
+
+    while (true) {
+      workloadInputStream.getline(line, maxLineSize, '\n');
+      if (workloadInputStream.eof()) {
+        break;
+      }
+      if (workloadInputStream.fail()) {
+        fprintf(stderr,
+                "Encountered an error while reading from workload: %s\n",
+                strerror(errno));
+        exit(1);
+      }
+
+      std::string workloadLine(line);
+      std::vector<std::string> commandElements = ROCKSDB_NAMESPACE::StringSplit(workloadLine, ' ');
+      if (commandElements.size() > 3) {
+        // skipping over the header
+        continue;
+      }
+
+      std::string *command = &(commandElements[0]);
+      std::string *key = &(commandElements[1]);
+
+      if (*command == "w") {
+        std::string *value = &(commandElements[2]);
+        operationStart = clock->NowMicros();
+        operationStatus = db->Put(writeOptions, *key, *value);
+      } else if (*command == "r") {
+        std::string value;
+        operationStart = clock->NowMicros();
+        operationStatus = db->Get(readOptions, *key, &value);
+      } else if (*command == "d") {
+        operationStart = clock->NowMicros();
+        operationStatus = db->Delete(writeOptions, *key);
+      } else if (*command == "end") {
+        std::cout << "Preamble done, running actual workload.\n";
+        continue;
+      } else {
+        fprintf(stderr,
+                "Unsupported command '%s' found in workload.\n", command->c_str());
+        exit(1);
+      }
+
+      if (!operationStatus.ok()) {
+        fprintf(stderr, "Operation '%s' on key '%s' failed: %s\n",
+                command->c_str(), key->c_str(), operationStatus.ToString().c_str());
+        exit(1);
+      }
+
+      totalOperationDurationMicros += (clock->NowMicros() - operationStart);
+    }
+
+    uint64_t workloadEnd = clock->NowMicros();
+
+    std::cout << "Done reading from workload file.\n";
+    std::cout << "\tTotal execution time: " << FormatDuration(workloadEnd - workloadStart) << "\n";
+    std::cout << "\tTime dedicated to operations: " << FormatDuration(totalOperationDurationMicros) << "\n";
+    free(line);
   }
 
 #ifndef ROCKSDB_LITE
