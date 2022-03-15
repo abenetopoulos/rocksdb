@@ -629,7 +629,7 @@ function run_runcustomworkload {
   echo "Running custom workload"
   log_file_name="${output_dir}/benchmark_runcustomworkload.t${num_threads}.log"
   cmd="./db_bench --benchmarks=runcustomworkload \
-       --use_existing_db=1 \
+       --use_existing_db=0 \
        $params_w \
        --threads=$num_threads \
        --seed=$( date +%s ) \
