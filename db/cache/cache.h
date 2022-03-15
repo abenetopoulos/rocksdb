@@ -32,6 +32,7 @@ namespace ROCKSDB_NAMESPACE {
     static const string NOT_FOUND;
     robin_hood::unordered_map<string, cache_entry*> *map;
     uint64_t capacity;
+    uint64_t numResidentElements = 0;
 
     // NOTE this is here simply because I am lazy.
     Statistics* stats_;

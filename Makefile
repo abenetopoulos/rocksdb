@@ -102,11 +102,15 @@ endif
 endif
 
 # Lookaside-cache build flag.
-LAC_POLICY ?= "LFU"
+LAC_POLICY ?= "N/A"
+LAC_RECLAIM_FREQUENCY_NODES ?= 1
 ifeq ($(LAC_POLICY), "LRU")
 	OPT += -DLAC_POLICY_LRU -DLAC_ENABLE
 else ifeq ($(LAC_POLICY), "LFU")
 	OPT += -DLAC_POLICY_LFU -DLAC_ENABLE
+ifeq ($(LAC_RECLAIM_FREQUENCY_NODES), 1)
+	OPT += -DLA_CACHE_KEEP_EMPTY_FREQ_NODES
+endif
 endif
 
 $(info Cache policy flag is ${OPT})

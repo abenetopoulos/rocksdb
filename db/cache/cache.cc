@@ -41,20 +41,26 @@ namespace ROCKSDB_NAMESPACE {
   }
 
   cache_entry* cache::Lookup(string& key, bool markMiss) {
-    cache_entry *res;
+#ifndef LA_DISALLOW_NULL_ENTRIES
+    cache_entry *res = (*map)[key];
 
-    try {
-      res = this->map->at(key);
-      policy->MarkAccess(key, res);
+    if (res != nullptr) {
       RecordTick(stats_, LOOKASIDE_CACHE_HIT);
-    } catch(const out_of_range& e) {
-      if (markMiss) {
-        RecordTick(stats_, LOOKASIDE_CACHE_MISS);
-      }
-      return nullptr;
+      return res;
+    }
+#else
+    auto res = map->find(key);
+    if (res != map->end()) {
+      RecordTick(stats_, LOOKASIDE_CACHE_HIT);
+      return res->second;
+    }
+#endif
+
+    if (markMiss) {
+      RecordTick(stats_, LOOKASIDE_CACHE_MISS);
     }
 
-    return res;
+    return nullptr;
   }
 
   void cache::Insert(string& key, string* value) {
@@ -63,14 +69,16 @@ namespace ROCKSDB_NAMESPACE {
       return;
     }
 
-    while (map->size() >= capacity) {
+    while (numResidentElements >= capacity) {
       map->erase(policy->Evict());
+      numResidentElements--;
       RecordTick(stats_, LOOKASIDE_CACHE_EVICTION);
     }
 
     cache_entry *newEntry = new cache_entry(value);
     (*map)[key] = newEntry;
     policy->MarkInsertion(key, newEntry);
+    numResidentElements++;
   }
 
   void cache::Update(Slice& keySlice, string* updatedValue) {
@@ -100,6 +108,7 @@ namespace ROCKSDB_NAMESPACE {
       throw std::runtime_error("Failed to evict key node for key");
     }
 
+    numResidentElements--;
     delete maybeEntry;
   }
 }

@@ -286,8 +286,8 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   cacheOptions.UpdateFromEnv();
 
 #ifdef LAC_ENABLE
-      lookasideCache = new cache(cacheOptions);
-      lookasideCache->stats_ = immutable_db_options_.stats;
+  lookasideCache = new cache(cacheOptions);
+  lookasideCache->stats_ = immutable_db_options_.stats;
 #endif
 }
 
