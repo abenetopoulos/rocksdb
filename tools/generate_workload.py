@@ -261,6 +261,9 @@ def generate_workload(workload_parameters: Parameters):
                     del written_keys_and_locations[command_key]
                     valid_read_keys.remove(command_key)
 
+                    if last_written_key == command_key:
+                        last_written_key = max(written_keys_and_locations)
+
                     break
             else:
                 if (
