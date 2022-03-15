@@ -2016,8 +2016,9 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   }
 
   s = Write(opt, &batch);
+#ifdef LAC_ENABLE
   cache *lookasideCache = ((DBImpl*) this)->lookasideCache;
-  if (s.ok() && lookasideCache) {
+  if (s.ok()) {
     Slice nonConstKey = Slice(key.data(), key.size());
 
     if (opt.invalidate_cache_on_write) {
@@ -2028,8 +2029,10 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
       lookasideCache->Update(nonConstKey, newValue);
     }
   }
+#endif
 
   return s;
+
 }
 
 Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,
@@ -2062,11 +2065,13 @@ Status DB::Delete(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   }
 
   s = Write(opt, &batch);
+#ifdef LAC_ENABLE
   cache *lookasideCache = ((DBImpl*) this)->lookasideCache;
-  if (s.ok() && lookasideCache) {
+  if (s.ok()) {
     Slice nonConstKey = Slice(key.data(), key.size());
     lookasideCache->Remove(nonConstKey);
   }
+#endif
 
   return s;
 }
@@ -2103,11 +2108,13 @@ Status DB::SingleDelete(const WriteOptions& opt,
   }
   s = Write(opt, &batch);
 
+#ifdef LAC_ENABLE
   cache *lookasideCache = ((DBImpl*) this)->lookasideCache;
-  if (s.ok() && lookasideCache) {
+  if (s.ok()) {
     Slice nonConstKey = Slice(key.data(), key.size());
     lookasideCache->Remove(nonConstKey);
   }
+#endif
 
   return s;
 }
