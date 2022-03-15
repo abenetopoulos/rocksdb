@@ -45,6 +45,9 @@ namespace ROCKSDB_NAMESPACE {
     robin_hood::unordered_map<string, lfu_key_node*> *map;
     lfu_frequency_node *frequencies;
 
+    lfu_key_node *reusableNodes;
+
+
     lfu_policy(uint64_t capacity);
 
     void MarkInsertion(string& key, cache_entry *cacheEntry);
@@ -55,5 +58,8 @@ namespace ROCKSDB_NAMESPACE {
     string EvictKeyNode(lfu_key_node *keyNode);
 
     void DeleteFrequencyNode(lfu_frequency_node* frequencyNode);
+
+    void ReclaimNode(lfu_key_node *keyNode);
+    lfu_key_node* NewKeyNode(string& key);
   };
 }

@@ -23,6 +23,8 @@ namespace ROCKSDB_NAMESPACE {
     lru_key_node *keysStart;
     lru_key_node *keysEnd;
 
+    lru_key_node *reusableNodes;
+
     lru_policy();
 
     void InsertKeyNode(lru_key_node *keyNode);
@@ -33,5 +35,8 @@ namespace ROCKSDB_NAMESPACE {
     string Evict();
     string Evict(cache_entry *cacheEntry);
     string EvictKeyNode(lru_key_node *keyNode);
+
+    void ReclaimNode(lru_key_node *keyNode);
+    lru_key_node* NewKeyNode(string& key);
   };
 }

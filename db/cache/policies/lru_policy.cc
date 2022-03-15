@@ -9,6 +9,8 @@ namespace ROCKSDB_NAMESPACE {
   lru_policy::lru_policy() {
     keysStart = nullptr;
     keysEnd = nullptr;
+
+    reusableNodes = nullptr;
   }
 
   void lru_policy::InsertKeyNode(lru_key_node *keyNode) {
@@ -83,7 +85,25 @@ namespace ROCKSDB_NAMESPACE {
     string res = keyNode->key;
 
     RemoveKeyNode(keyNode);
-    delete keyNode;
+    ReclaimNode(keyNode);
+
+    return res;
+  }
+
+  void lru_policy::ReclaimNode(lru_key_node *keyNode) {
+    keyNode->next = reusableNodes;
+    reusableNodes = keyNode;
+  }
+
+  lru_key_node* lru_policy::NewKeyNode(string& key) {
+    if (!reusableNodes) {
+      return new lru_key_node(key);
+    }
+
+    lru_key_node *res = reusableNodes;
+    reusableNodes = res->next;
+
+    res->key = key;
 
     return res;
   }

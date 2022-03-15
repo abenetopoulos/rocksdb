@@ -56,10 +56,11 @@ namespace ROCKSDB_NAMESPACE {
   lfu_policy::lfu_policy(uint64_t capacity) {
     map = new robin_hood::unordered_map<string, lfu_key_node*>(capacity);
     frequencies = nullptr;
+    reusableNodes = nullptr;
   }
 
   void lfu_policy::MarkInsertion(string& key, cache_entry *cacheEntry) {
-    lfu_key_node *keyNode = new lfu_key_node(key);
+    lfu_key_node *keyNode = NewKeyNode(key);
     (*map)[key] = keyNode;
 
     lfu_frequency_node* frequencyNode = frequencies;
@@ -106,9 +107,11 @@ namespace ROCKSDB_NAMESPACE {
 
     frequencyNode->ExchangeKey(keyNode, newFrequencyNode);
 
+#ifndef LA_CACHE_KEEP_EMPTY_FREQ_NODES
     if (!frequencyNode->keys) {
       DeleteFrequencyNode(frequencyNode);
     }
+#endif
   }
 
 
@@ -125,11 +128,14 @@ namespace ROCKSDB_NAMESPACE {
     }
 
     map->erase(nodeToEvict->key);
-    delete nodeToEvict;
+    ReclaimNode(nodeToEvict);
+    // delete nodeToEvict;
 
+#ifndef LA_CACHE_KEEP_EMPTY_FREQ_NODES
     if (!correspondingFrequencyNode->keys) {
       DeleteFrequencyNode(correspondingFrequencyNode);
     }
+#endif
 
     return res;
   }
@@ -166,6 +172,26 @@ namespace ROCKSDB_NAMESPACE {
     }
 
     delete nodeToDelete;
+  }
+
+  void lfu_policy::ReclaimNode(lfu_key_node *keyNode) {
+    keyNode->next = reusableNodes;
+    keyNode->frequencyNode = nullptr;
+
+    reusableNodes = keyNode;
+  }
+
+  lfu_key_node* lfu_policy::NewKeyNode(string& key) {
+    if (!reusableNodes) {
+      return new lfu_key_node(key);
+    }
+
+    lfu_key_node *res = reusableNodes;
+    reusableNodes = res->next;
+
+    res->key = key;
+
+    return res;
   }
 
   const string lfu_policy::NO_FREQUENCY_INFO = "ELFUPOLICYNOFREQINFO";
