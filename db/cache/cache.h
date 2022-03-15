@@ -18,10 +18,8 @@ using namespace std;
 
 #ifdef LAC_POLICY_LRU
 #define LAC_POLICY lru_policy
-#define LAC_POLICY_C(c) lru_policy()
 #else
 #define LAC_POLICY lfu_policy
-#define LAC_POLICY_C(c) lfu_policy((c))
 #endif
 
 namespace ROCKSDB_NAMESPACE {

@@ -53,15 +53,13 @@ namespace ROCKSDB_NAMESPACE {
     targetFrequencyNode->AddKey(keyNode);
   }
 
-  lfu_policy::lfu_policy(uint64_t capacity) {
-    map = new robin_hood::unordered_map<string, lfu_key_node*>(capacity);
+  lfu_policy::lfu_policy() {
     frequencies = nullptr;
     reusableNodes = nullptr;
   }
 
   void lfu_policy::MarkInsertion(string& key, cache_entry *cacheEntry) {
     lfu_key_node *keyNode = NewKeyNode(key);
-    (*map)[key] = keyNode;
 
     lfu_frequency_node* frequencyNode = frequencies;
 
@@ -83,17 +81,9 @@ namespace ROCKSDB_NAMESPACE {
   }
 
   void lfu_policy::MarkAccess(string& key, cache_entry *cacheEntry) {
-    lfu_key_node *keyNode = (*map)[key];
-    if (!keyNode) {
-      // NOTE @workaround so this conditional is here as a workaround for a weird bug where
-      // we end up trying to mark an access to an entry that _should_ have been here
-      // (experiments show this happens for keys that have already been inserted and
-      // confirmed as inserted, which were also never evicted). It is possible that either
-      // we're messing up somehow, or that the library that implements our hashmaps has a bug.
-      // It's worth investigating, but not right now.
-      keyNode = (lfu_key_node *) cacheEntry->extra;
-      (*map)[key] = keyNode;
-    }
+    lfu_key_node *keyNode = (lfu_key_node *) cacheEntry->extra;
+    (void) key;
+    // assert(keyNode->key == key);
     lfu_frequency_node* frequencyNode = keyNode->frequencyNode;
 
     lfu_frequency_node* newFrequencyNode = frequencyNode->next;
@@ -127,9 +117,7 @@ namespace ROCKSDB_NAMESPACE {
       nodeToEvict->prev->next = nodeToEvict->next;
     }
 
-    map->erase(nodeToEvict->key);
     ReclaimNode(nodeToEvict);
-    // delete nodeToEvict;
 
 #ifndef LA_CACHE_KEEP_EMPTY_FREQ_NODES
     if (!correspondingFrequencyNode->keys) {

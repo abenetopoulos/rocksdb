@@ -42,13 +42,10 @@ namespace ROCKSDB_NAMESPACE {
     //  - sanitize memory accesses to avoid null-ptr derefs
     static const string NO_FREQUENCY_INFO;
 
-    robin_hood::unordered_map<string, lfu_key_node*> *map;
     lfu_frequency_node *frequencies;
-
     lfu_key_node *reusableNodes;
 
-
-    lfu_policy(uint64_t capacity);
+    lfu_policy();
 
     void MarkInsertion(string& key, cache_entry *cacheEntry);
     void MarkAccess(string& key, cache_entry *cacheEntry);
