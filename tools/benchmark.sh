@@ -121,6 +121,8 @@ key_size=${KEY_SIZE:-20}
 value_size=${VALUE_SIZE:-400}
 block_size=${BLOCK_SIZE:-8192}
 
+track_statistics=${TRACK_STATISTICS:-0}
+
 const_params="
   --db=$DB_DIR \
   --wal_dir=$WAL_DIR \
@@ -151,7 +153,7 @@ const_params="
   --delete_obsolete_files_period_micros=$((60 * M)) \
   --max_bytes_for_level_multiplier=8 \
   \
-  --statistics=0 \
+  --statistics=$track_statistics \
   --stats_per_interval=1 \
   --stats_interval_seconds=60 \
   --histogram=1 \

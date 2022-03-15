@@ -28,6 +28,7 @@
 #endif
 #include <atomic>
 #include <cinttypes>
+#include <cmath>
 #include <condition_variable>
 #include <cstddef>
 #include <memory>
@@ -7439,6 +7440,8 @@ class Benchmark {
     }
 
     uint64_t s = floor(ms / 1000.0);
+    ms = std::fmod(ms, 1000.0);
+
     if (s < 60) {
       res << s << "s, " << FIXED_DOUBLE(ms) << "ms, " << us << "μs";
       return res.str();
@@ -7540,6 +7543,7 @@ class Benchmark {
     std::cout << "Done reading from workload file.\n";
     std::cout << "\tTotal execution time: " << FormatDuration(workloadEnd - workloadStart) << "\n";
     std::cout << "\tTime dedicated to operations: " << FormatDuration(totalOperationDurationMicros) << "\n";
+    std::cout << "\tOperations duration in microseconds: " << totalOperationDurationMicros << "\n";
     free(line);
   }
 
